@@ -1,3 +1,5 @@
+## Redis OLA
+
 We were tasked with implementing 2 of the following 6 projects:
 
 1. Redis with Retention Policy in Redis
@@ -12,4 +14,5 @@ We were tasked with implementing 2 of the following 6 projects:
 
 6. Redis Bloom Filters
 
-Tasks are specified 
+Tasks are specified here: https://github.com/MrJustMeDahl/redis_ola/blob/main/Redis%20Study%20point%20Assignment.pdf
+
