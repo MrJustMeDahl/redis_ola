@@ -1,0 +1,5 @@
+This command spins up a container on the same network as the 3 clusters and connects the redis containers via their IPs.
+The 3 containers perform a handshake and hash slots is assigned.
+In this case cluster-replicas is set to 0, meaning there is only master nodes in this cluster. 
+
+docker run -it --rm --network redis-cluster_redis-cluster redis:7 redis-cli --cluster create 172.30.0.2:6379 172.30.0.3:6379 172.30.0.4:6379 --cluster-replicas 0
