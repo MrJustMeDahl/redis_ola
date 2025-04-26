@@ -1,15 +1,17 @@
-from redis.cluster import RedisCluster
+from redis.cluster import RedisCluster, ClusterNode
 from redis.exceptions import RedisError
 
 nodes = [
-    {"host": "localhost", "port": 7000},
-    {"host": "localhost", "port": 7001},
-    {"host": "localhost", "port": 7002},
+    ClusterNode(host="localhost", port=7001),
+    ClusterNode(host="localhost", port=7002),
+    ClusterNode(host="localhost", port=7003),
 ]
 
-redisCluster = RedisCluster(startup_nodes=nodes, decode_responses=True)
+def getRedisCluster():
+    return RedisCluster(startup_nodes=nodes, decode_responses=True)
 
 def createUser(userId, userName, userEmail):
+    redisCluster = getRedisCluster()
     try:
         if redisCluster.exists(userId):
             print(f"User {userId} already exists.")
@@ -22,6 +24,7 @@ def createUser(userId, userName, userEmail):
         return None
 
 def getUser(userId):
+    redisCluster = getRedisCluster()
     try:
         user = redisCluster.hgetall(userId)
         if not user:
@@ -33,6 +36,7 @@ def getUser(userId):
         return None
 
 def updateUser(userId, userName=None, userEmail=None):
+    redisCluster = getRedisCluster()
     try:
         if not redisCluster.exists(userId):
             print(f"User {userId} not found.")
@@ -47,6 +51,7 @@ def updateUser(userId, userName=None, userEmail=None):
         return None
 
 def deleteUser(userId):
+    redisCluster = getRedisCluster()
     try:
         if not redisCluster.exists(userId):
             print(f"User {userId} not found.")
