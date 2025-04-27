@@ -391,3 +391,119 @@ The results is as expected.
 - We get confirmation that the update is happening in Redis, as the second time we retrieve user1 the name and email has been changed. 
 - We get confirmation that the user is being deleted, and isn't able to be retrieved anymore after deletion. 
 - In the end we confirm that this is all done up against the Redis Cluster which handles the allocation of data between nodes, by accessing Redis-CLI on node 1 and finding out that user2 is in fact in the Redis database, but located on node 3, which we then have access to after swapping to node 3. (Keep in mind we could have accessed user2 through node 1, if we used Redis-CLI in clustermode, this was just to make sure the cluster allocation was working as intended for new data entries.)
+
+### 6 Redis Bloom Filters
+
+#### 6.1 Install Redis on your machine and configure it to run on the default port (6379).
+Docker is being used to containerize an image of Redis that has Redisbloom installed, which is necessary to create Bloom Filters in Redis. 
+
+```
+version: '3'
+
+services:
+  redis:
+    image: redislabs/rebloom:latest
+    container_name: redis-bloom-container
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+
+volumes:
+  redis-data:
+    driver: local
+```
+
+#### 6.2 Use the Redis CLI or Redis Telnet CLI to set up a Bloom Filter in Redis.
+To set up the Bloom Filter using Redis CLI, the following commands were used. 
+
+```
+BF.RESERVE userfilter 0.01 100
+```
+This command sets up the Bloom Filter, named userfilter. The attributes is used for an algorithm that figures out the correct length of the index and how many the amount of seeds needed for the encryption. In this case we expect 100 entries in the filter and is satisfied with a false positive rate of 1%. 
+
+#### 6.3 Use the Redis CLI or Redis CLI to add some user IDs to the Bloom Filter.
+The following commands were used to add users to the Bloom Filter.
+
+```
+BF.ADD userfilter user1
+BF.ADD userfilter user2
+BF.ADD userfilter user3
+BF.ADD userfilter user4
+BF.ADD userfilter user5
+BF.ADD userfilter user6
+```
+
+#### 6.4 Use the Redis CLI or Redis Telnet CLI to test if a user ID is a member of the Bloom Filter
+The following commands were used to check if a user was probably in the filter. 
+
+```
+BF.EXISTS userfilter user4
+BF.EXISTS userfilter user7
+```
+
+![image](documentation/bloomfilter_cli_test.png)
+
+The exists returns if a user is probably in the filter or not, meaning it will answer in a true or false format, 1 being the user is probably there and 0 the user is definitely not there. 
+
+We also tested from the perspective of using the Bloom Filter from a python application running the following code: 
+
+```
+import redis
+
+redisClient = redis.StrictRedis(host='localhost', port=6379, db=0)
+filter_name = 'userfilter'
+
+def check_user(user_id):
+    result = redisClient.execute_command('BF.EXISTS', filter_name,user_id)
+    if result == 1:
+        print(f"User {user_id} exists in the Bloom Filter (probable).")
+    else:
+        print(f"User {user_id} does not exist in the Bloom Filter.")
+
+```
+Result:
+
+![image](documentation/bloomfilter_app_test.png)
+
+We get the same result as when we are asking within the Redis CLI, however this example shows how to utilize the response to perform some task, in this case write the result of the response to the terminal.
+
+#### 6.5 Verify that the Bloom Filter returns false positives but no false negatives. 
+In order to verify that the Bloom Filter is able to produce false positives it is needed to try verifying the existence of different user keys in the Bloom Filter, until you come across a false positive. The reasoning behind this is that the index and encryption of the entries is abstracted away from us, meaning there is no way to manually create an entry we now already exists in the Bloom Filter (without it actually being there).
+
+Therefore we added users in the Bloom Filter up until there was 25 users. This was done to increase the amount of indexes being ticked, to shorten the search time for a false positive. 
+
+Then a new function was created to check for false positives. 
+
+```
+def check_false_positive(user_id):
+    result = redisClient.execute_command('BF.EXISTS', filter_name,user_id)
+    if result == 1:
+        print(f"User {user_id} exists in the Bloom Filter (probable).")
+    else:
+        print(f"User {user_id} does not exist in the Bloom Filter.")
+    return result
+```
+
+And a loop that would continue until it came across a false positive was created. 
+
+```
+    baseid = 'user'
+    startid = 26
+
+    while True:
+        user_id = f"{baseid}{startid}"
+        result = check_false_positive(user_id)
+        startid += 1
+        if result == 1:
+            break
+```
+
+Keep in mind this only works because we added the users to the Bloom Filter manually, and therefore knows we are never going to hit a true positive with this setup, as we know exactly which user IDs are in the Filter. 
+
+Result: 
+
+![image](documentation/BF_verify_false_positive.png)
+
+We managed to find a false positive after having tested more than 13.000 different entries, seeing as the Bloom Filter responded that user13554 probably exists in the Bloom Filter, while we know it certainly doesn't.

@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  redis:
+    image: redislabs/rebloom:latest
+    container_name: redis-bloom-container
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+
+volumes:
+  redis-data:
+    driver: local
