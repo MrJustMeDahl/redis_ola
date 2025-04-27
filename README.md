@@ -139,6 +139,135 @@ When adding the users to the cluster, Redis redirects the data to the correct no
 
 #### 3.5 Test the configuration by stopping one of the Redis instances and verifying that the Redis Cluster can handle requests. 
 
+For the setup we were initially doing here our cluster would stop working if one of the nodes stopped responding, as we were creating the cluster without replicas. Here is an example of trying to retrieve data from any of the 3 nodes after one of them is no longer running: 
+
+![image](documentation\clusterdown.png)
+
+To enable this functionality we created another 3 nodes (docker containers based on the redis image) and created the cluster anew this time making sure each master node has 1 replica. 
+
+```
+version: "3"
+
+services:
+  redis-node-1:
+    image: redis:7
+    container_name: redis-node-1
+    ports:
+      - "7001:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      redis-cluster:
+        ipv4_address: 172.30.0.2
+
+  redis-node-2:
+    image: redis:7
+    container_name: redis-node-2
+    ports:
+      - "7002:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      redis-cluster:
+        ipv4_address: 172.30.0.3
+
+  redis-node-3:
+    image: redis:7
+    container_name: redis-node-3
+    ports:
+      - "7003:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      redis-cluster:
+        ipv4_address: 172.30.0.4
+
+  redis-node-4:
+    image: redis:7
+    container_name: redis-node-4
+    ports:
+      - "7004:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      redis-cluster:
+        ipv4_address: 172.30.0.5
+
+  redis-node-5:
+    image: redis:7
+    container_name: redis-node-5
+    ports:
+      - "7005:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      redis-cluster:
+        ipv4_address: 172.30.0.6
+
+  redis-node-6:
+    image: redis:7
+    container_name: redis-node-6
+    ports:
+      - "7006:6379"
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      redis-cluster:
+        ipv4_address: 172.30.0.7
+
+  python-app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: python-app
+    volumes:
+      - ../app:/app
+    working_dir: /app
+    command: ["tail", "-f", "/dev/null"]
+    networks:
+      redis-cluster:
+        ipv4_address: 172.30.0.8
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+      - redis-node-6
+
+networks:
+  redis-cluster:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+```
+
+```
+docker run -it --rm --network redis-cluster_redis-cluster redis:7 redis-cli --cluster create 172.30.0.2:6379 172.30.0.3:6379 172.30.0.4:6379 172.30.0.5:6379 172.30.0.6:6379 172.30.0.7:6379 --cluster-replicas 1
+```
+
+Notice now how when creating the cluster each node is setup either as a master node or replica node. 
+
+![image](documentation\cluster_with_replicas.png)
+
+Once again redis-node-3 was shutdown.
+
+![image](documentation\node_shutdown.png)
+
+But when trying to retrieve data from the cluster we are still able to get users from the different nodes. 
+
+![image](documentation\Replica_test.png)
+
+Keep in mind this time around the only notice of the cluster losing connection to a master node, is that the redis-cli instance was disconnected by the server for the very short amount of time required to allow the replica node to take over. After that all data was still available. 
+
 ### CRUD
 
 For the small CRUD application we used python and decided to run the CRUD operations up against the Redis Cluster. The redis.cluster library is used to connect to the cluster, which requires ClusterNode objects to be setup:

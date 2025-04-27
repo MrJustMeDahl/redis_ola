@@ -5,6 +5,9 @@ nodes = [
     ClusterNode(host="redis-node-1", port=6379),
     ClusterNode(host="redis-node-2", port=6379),
     ClusterNode(host="redis-node-3", port=6379),
+    ClusterNode(host="redis-node-4", port=6379),
+    ClusterNode(host="redis-node-5", port=6379),
+    ClusterNode(host="redis-node-6", port=6379),
 ]
 
 def getRedisCluster():
