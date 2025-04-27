@@ -2,9 +2,9 @@ from redis.cluster import RedisCluster, ClusterNode
 from redis.exceptions import RedisError
 
 nodes = [
-    ClusterNode(host="localhost", port=7001),
-    ClusterNode(host="localhost", port=7002),
-    ClusterNode(host="localhost", port=7003),
+    ClusterNode(host="redis-node-1", port=6379),
+    ClusterNode(host="redis-node-2", port=6379),
+    ClusterNode(host="redis-node-3", port=6379),
 ]
 
 def getRedisCluster():
