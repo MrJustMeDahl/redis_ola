@@ -139,3 +139,126 @@ When adding the users to the cluster, Redis redirects the data to the correct no
 
 #### 3.5 Test the configuration by stopping one of the Redis instances and verifying that the Redis Cluster can handle requests. 
 
+### CRUD
+
+For the small CRUD application we used python and decided to run the CRUD operations up against the Redis Cluster. The redis.cluster library is used to connect to the cluster, which requires ClusterNode objects to be setup:
+
+```
+from redis.cluster import RedisCluster, ClusterNode
+from redis.exceptions import RedisError
+
+nodes = [
+    ClusterNode(host="redis-node-1", port=6379),
+    ClusterNode(host="redis-node-2", port=6379),
+    ClusterNode(host="redis-node-3", port=6379),
+]
+
+def getRedisCluster():
+    return RedisCluster(startup_nodes=nodes, decode_responses=True)
+```
+Keep in mind in this case we are using the names of the docker containers containing the redis nodes, as the python application runs within the same docker network. Normally however it is required to define the IPs of the nodes. 
+
+RedisError is used to handle exceptions thrown by Redis, in case something goes wrong on the database side. We are not doing extensive error handling here, just making sure that we are notified if something is wrong with the cluster.
+
+#### Create
+
+```
+def createUser(userId, userName, userEmail):
+    redisCluster = getRedisCluster()
+    try:
+        if redisCluster.exists(userId):
+            print(f"User {userId} already exists.")
+            return None
+        redisCluster.hset(userId, mapping={"name": userName, "email": userEmail})
+        print(f"User {userId} created successfully.")
+        return redisCluster.hgetall(userId)
+    except RedisError as e:
+        print(f"Error creating user {userId}: {e}")
+        return None
+```
+For the create function we are making sure we are not overwriting an existing key (seeing as you'd use update, if you wanted to overwrite a key), and otherwise adding a user using hset. 
+
+#### Read
+
+```
+def getUser(userId):
+    redisCluster = getRedisCluster()
+    try:
+        user = redisCluster.hgetall(userId)
+        if not user:
+            print(f"User {userId} not found.")
+            return None
+        return user
+    except RedisError as e:
+        print(f"Error retrieving user {userId}: {e}")
+        return None
+```
+For the read function the only error handling we are doing is to notify if the key you are looking for doesn't exist. 
+
+#### Update
+
+```
+def updateUser(userId, userName=None, userEmail=None):
+    redisCluster = getRedisCluster()
+    try:
+        if not redisCluster.exists(userId):
+            print(f"User {userId} not found.")
+            return None
+        if userName:
+            redisCluster.hset(userId, "name", userName)
+        if userEmail:
+            redisCluster.hset(userId, "email", userEmail)
+        return redisCluster.hgetall(userId)
+    except RedisError as e:
+        print(f"Error updating user {userId}: {e}")
+        return None
+```
+First of all we are making sure that the user you are trying to alter actually exists, otherwise it would create a new user with that key, potentially risking duplicating a data entry. The function is made so you can update either username, email or both within the same function. 
+
+#### Delete
+
+```
+def deleteUser(userId):
+    redisCluster = getRedisCluster()
+    try:
+        if not redisCluster.exists(userId):
+            print(f"User {userId} not found.")
+            return None
+        result = redisCluster.delete(userId)
+        if result == 1:
+            print(f"User {userId} deleted successfully.")
+            return True
+        else:
+            print(f"Failed to delete user {userId}.")
+            return False
+    except RedisError as e:
+        print(f"Error deleting user {userId}: {e}")
+        return None
+```
+Again making sure the user we are trying to delete exists before doing anything else, in this case mainly to notify that the key isn't there, even though there is not any harm done to the database if you try to delete something that isn't there. The response from Redis is used to determine if the operation is a success or not. 
+
+#### Lightweight Testing
+
+To test if the CRUD operations is working as intended we used the following function. 
+
+```
+def main():
+    createUser("user1", "John Doe", "johnd@test.com")
+    createUser("user2", "Jane Doe", "janed@test.com")
+    print(getUser("user1"))
+    updateUser("user1", userName="John Smith", userEmail="johns@test.com")
+    print(getUser("user1"))
+    deleteUser("user1")
+    print(getUser("user1"))
+```
+
+Result: 
+![image](documentation\main_result.png)
+
+The results is as expected. 
+
+- We get confirmation that the 2 users are created. 
+- We get confirmation that getUser function is able to retrieve on of the users from Redis.
+- We get confirmation that the update is happening in Redis, as the second time we retrieve user1 the name and email has been changed. 
+- We get confirmation that the user is being deleted, and isn't able to be retrieved anymore after deletion. 
+- In the end we confirm that this is all done up against the Redis Cluster which handles the allocation of data between nodes, by accessing Redis-CLI on node 1 and finding out that user2 is in fact in the Redis database, but located on node 3, which we then have access to after swapping to node 3. (Keep in mind we could have accessed user2 through node 1, if we used Redis-CLI in clustermode, this was just to make sure the cluster allocation was working as intended for new data entries.)
