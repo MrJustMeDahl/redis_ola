@@ -113,7 +113,7 @@ docker run -it --rm --network redis-cluster_redis-cluster redis:7 redis-cli --cl
 
 The command starts a redis container on the same network and uses the redis-cli to create the cluster based on the docker IPs of the nodes. In this case we chose to have 0 replicas to minimize the amount of containers running on the same machine, although in a production environment it is recommended to make a cluster of at least 6 nodes, 3 being master nodes and 3 being replicas, to ensure fault safety, as a replica node would take over in case a master node fails. 
 
-![image](documentation\cluster_creation.png)
+![image](documentation/cluster_creation.png)
 
 #### 3.3 Use the Redis CLI or Redis Telnet CLI to store user data in the Redis Cluster.
 
@@ -133,7 +133,7 @@ HSET user7 name "Evan Wright" email "evan@example.com"
 
 #### 3.4 Verify that data is distributed evenly across the Redis Cluster. 
 
-![image](documentation\redis_cli_users_added.png)
+![image](documentation/redis_cli_users_added.png)
 
 When adding the users to the cluster, Redis redirects the data to the correct node based the hash slot of the data. The image indicates that Redis is allocating hash slots and distributing data to all 3 nodes.
 
@@ -141,7 +141,7 @@ When adding the users to the cluster, Redis redirects the data to the correct no
 
 For the setup we were initially doing here our cluster would stop working if one of the nodes stopped responding, as we were creating the cluster without replicas. Here is an example of trying to retrieve data from any of the 3 nodes after one of them is no longer running: 
 
-![image](documentation\clusterdown.png)
+![image](documentation/clusterdown.png)
 
 To enable this functionality we created another 3 nodes (docker containers based on the redis image) and created the cluster anew this time making sure each master node has 1 replica. 
 
@@ -256,15 +256,15 @@ docker run -it --rm --network redis-cluster_redis-cluster redis:7 redis-cli --cl
 
 Notice now how when creating the cluster each node is setup either as a master node or replica node. 
 
-![image](documentation\cluster_with_replicas.png)
+![image](documentation/cluster_with_replicas.png)
 
 Once again redis-node-3 was shutdown.
 
-![image](documentation\node_shutdown.png)
+![image](documentation/node_shutdown.png)
 
 But when trying to retrieve data from the cluster we are still able to get users from the different nodes. 
 
-![image](documentation\Replica_test.png)
+![image](documentation/Replica_test.png)
 
 Keep in mind this time around the only notice of the cluster losing connection to a master node, is that the redis-cli instance was disconnected by the server for the very short amount of time required to allow the replica node to take over. After that all data was still available. 
 
@@ -382,7 +382,7 @@ def main():
 ```
 
 Result: 
-![image](documentation\main_result.png)
+![image](documentation/main_result.png)
 
 The results is as expected. 
 
